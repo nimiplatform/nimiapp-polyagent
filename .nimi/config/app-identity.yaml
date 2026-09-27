@@ -1,0 +1,8 @@
+app_id: nimi.polyagent
+display_name: PolyAgent
+version: 0.1.0
+npm_package_name: nimiapp-polyagent
+cargo_package_name: nimiapp-polyagent-shell
+tauri_identifier: ai.nimi.apps.nimi.polyagent
+package_author: Nimi Team
+identity_role: scaffold-generated-authoring-input

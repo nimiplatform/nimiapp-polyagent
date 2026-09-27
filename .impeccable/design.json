@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T15:34:37.887181+00:00",
+  "title": "Design System: PolyAgent",
+  "extensions": {
+    "colorMeta": {
+      "action-teal": {
+        "role": "primary",
+        "displayName": "Action Teal",
+        "canonical": "#087f82",
+        "tonalRamp": [
+          "oklch(15% 0.0907 197.77)",
+          "oklch(26% 0.0907 197.77)",
+          "oklch(38% 0.0907 197.77)",
+          "oklch(49% 0.0907 197.77)",
+          "oklch(61% 0.0907 197.77)",
+          "oklch(72% 0.0907 197.77)",
+          "oklch(84% 0.0907 197.77)",
+          "oklch(95% 0.0907 197.77)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#183d48",
+        "tonalRamp": [
+          "oklch(15% 0.0460 220.19)",
+          "oklch(26% 0.0460 220.19)",
+          "oklch(38% 0.0460 220.19)",
+          "oklch(49% 0.0460 220.19)",
+          "oklch(61% 0.0460 220.19)",
+          "oklch(72% 0.0460 220.19)",
+          "oklch(84% 0.0460 220.19)",
+          "oklch(95% 0.0460 220.19)"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#526b73",
+        "tonalRamp": [
+          "oklch(15% 0.0321 219.39)",
+          "oklch(26% 0.0321 219.39)",
+          "oklch(38% 0.0321 219.39)",
+          "oklch(49% 0.0321 219.39)",
+          "oklch(61% 0.0321 219.39)",
+          "oklch(72% 0.0321 219.39)",
+          "oklch(84% 0.0321 219.39)",
+          "oklch(95% 0.0321 219.39)"
+        ]
+      },
+      "cool-paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#f3f7f8",
+        "tonalRamp": [
+          "oklch(15% 0.0045 214.33)",
+          "oklch(26% 0.0045 214.33)",
+          "oklch(38% 0.0045 214.33)",
+          "oklch(49% 0.0045 214.33)",
+          "oklch(61% 0.0045 214.33)",
+          "oklch(72% 0.0045 214.33)",
+          "oklch(84% 0.0045 214.33)",
+          "oklch(95% 0.0045 214.33)"
+        ]
+      },
+      "separator": {
+        "role": "neutral",
+        "displayName": "Separator",
+        "canonical": "#dce6e8",
+        "tonalRamp": [
+          "oklch(15% 0.0111 211.04)",
+          "oklch(26% 0.0111 211.04)",
+          "oklch(38% 0.0111 211.04)",
+          "oklch(49% 0.0111 211.04)",
+          "oklch(61% 0.0111 211.04)",
+          "oklch(72% 0.0111 211.04)",
+          "oklch(84% 0.0111 211.04)",
+          "oklch(95% 0.0111 211.04)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "navigation": {
+        "role": "neutral",
+        "displayName": "Navigation",
+        "canonical": "#173c47",
+        "tonalRamp": [
+          "oklch(15% 0.0460 220.27)",
+          "oklch(26% 0.0460 220.27)",
+          "oklch(38% 0.0460 220.27)",
+          "oklch(49% 0.0460 220.27)",
+          "oklch(61% 0.0460 220.27)",
+          "oklch(72% 0.0460 220.27)",
+          "oklch(84% 0.0460 220.27)",
+          "oklch(95% 0.0460 220.27)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Operational headline",
+        "purpose": "Page title in the native UI family."
+      },
+      "table": {
+        "displayName": "Record text",
+        "purpose": "Dense comparable rows with tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "order-detail",
+        "value": "-12px 0 40px rgba(18, 45, 52, 0.12)",
+        "purpose": "Directional depth for the floating order detail panel."
+      }
+    ],
+    "motion": [
+      {
+        "name": "row-highlight",
+        "value": "background 0.16s ease-out",
+        "purpose": "Market-row selection and hover."
+      },
+      {
+        "name": "loading",
+        "value": "pa-spin 1.2s linear infinite",
+        "purpose": "Active work indicator; disabled under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow",
+        "value": "720px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1200px"
+      },
+      {
+        "name": "wide-desktop",
+        "value": "1550px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Nimi Kit action appearance within the PolyAgent workspace.",
+      "html": "<button class=\"ds-button-primary\">启动策略</button>",
+      "css": ".ds-button-primary{font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;font-size:12px;min-height:36px;padding:8px 12px;border:1px solid #087f82;border-radius:7px;background:#087f82;color:#ffffff;cursor:pointer}.ds-button-primary:hover{background:#06696c}.ds-button-primary:focus-visible{outline:3px solid #13878b;outline-offset:3px}.ds-button-primary:disabled{opacity:.48;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Nimi Kit action appearance within the PolyAgent workspace.",
+      "html": "<button class=\"ds-button-secondary\">扫描市场</button>",
+      "css": ".ds-button-secondary{font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;font-size:12px;min-height:36px;padding:8px 12px;border:1px solid #cbd9de;border-radius:7px;background:#ffffff;color:#183d48;cursor:pointer}.ds-button-secondary:hover{background:#edf4f5}.ds-button-secondary:focus-visible{outline:3px solid #13878b;outline-offset:3px}.ds-button-secondary:disabled{opacity:.48;cursor:not-allowed}"
+    },
+    {
+      "name": "Strategy input",
+      "kind": "input",
+      "description": "Numeric field with adjacent unit.",
+      "html": "<label class=\"ds-field\">单笔上限<div><input type=\"number\" value=\"5\" aria-label=\"单笔上限\"><span>美元</span></div></label>",
+      "css": ".ds-field{display:grid;gap:8px;font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;font-size:12px;color:#183d48}.ds-field>div{display:flex;align-items:center;border:1px solid #cbdade;background:#fafcfc;border-radius:7px;padding-right:10px}.ds-field input{width:100%;min-width:0;padding:9px 10px;border:0;background:none;color:#183d48;font-size:13px}.ds-field input:focus-visible{outline:3px solid #13878b;outline-offset:3px}.ds-field span{font-size:10px;white-space:nowrap;color:#526b73}"
+    },
+    {
+      "name": "Navigation row",
+      "kind": "nav",
+      "description": "Stable destination selection in the deep teal rail.",
+      "html": "<nav class=\"ds-nav\"><button aria-current=\"page\">交易工作台</button><button>订单账本</button></nav>",
+      "css": ".ds-nav{background:#173c47;padding:16px;display:grid;gap:7px;font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif}.ds-nav button{font:inherit;font-size:14px;border:0;background:none;color:#c7dbdf;text-align:left;border-radius:9px;padding:12px 11px;min-height:46px;cursor:pointer}.ds-nav button:hover{background:#244b55;color:white}.ds-nav button[aria-current]{background:#315b62;color:white}.ds-nav button:focus-visible{outline:3px solid #13878b;outline-offset:3px}"
+    },
+    {
+      "name": "Paper mode badge",
+      "kind": "chip",
+      "description": "Noninteractive state label, paired with explanatory mode copy.",
+      "html": "<span class=\"ds-mode\">模拟交易</span>",
+      "css": ".ds-mode{display:inline-flex;font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;font-size:12px;font-weight:650;border-radius:6px;background:#e6f1ec;color:#28604b;padding:7px 10px;white-space:nowrap}"
+    },
+    {
+      "name": "Working surface",
+      "kind": "card",
+      "refersTo": "working-surface",
+      "description": "Flat section boundary for comparable records.",
+      "html": "<section class=\"ds-surface\"><header><h2>订单与成交</h2></header><p>提交、成交与结算，分别留下记录。</p></section>",
+      "css": ".ds-surface{font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;color:#183d48;background:white;border:1px solid #dce6e8;border-radius:12px;overflow:hidden}.ds-surface header{padding:20px 21px;border-bottom:1px solid #dce6e8}.ds-surface h2{margin:0;font-size:16px;font-weight:680}.ds-surface p{padding:0 21px;font-size:12px;color:#526b73}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Scientific observation log",
+    "overview": "A scientific observation log for a personal trading workspace: cool working surfaces, precise records and restrained teal controls. The native Chinese UI typography supports reading, comparing and acting; there is no campaign-style display face.\n\nThe system uses flat bordered surfaces, compact tabular information and clear task spacing. Mode, uncertainty and action remain explicit in words as well as color. Its component vocabulary extends the public Nimi Kit controls.",
+    "keyCharacteristics": [
+      "Cool paper ground and deep teal navigation.",
+      "Native Chinese UI typography with tabular numerals.",
+      "Flat working surfaces with fine separators.",
+      "Persistent mode and mandate; evidence stays adjacent to selection."
+    ],
+    "rules": [
+      {
+        "name": "The Evidence Rule",
+        "body": "Use words and records to explain state; color reinforces the explanation.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Reading Rule",
+        "body": "Keep operational headings and numbers in the native UI family, with tabular numerals for comparisons.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workspace Rule",
+        "body": "Working surfaces use borders and tone; floating order details alone use directional depth.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the visible distinction between paper and live trading.",
+      "Do reuse Nimi Kit controls and its protected-focus overlay behavior.",
+      "Do retain tabular numerals, visible focus and readable secondary text.",
+      "Do keep selected detail consistent with the visible filtered records."
+    ],
+    "donts": [
+      "Don't imply a confirmed fill from an accepted or uncertain submission.",
+      "Don't use color as the sole signal for mode or order state.",
+      "Don't add decorative dashboard gauges or promotional display typography to operational records."
+    ]
+  }
+}

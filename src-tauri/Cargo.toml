@@ -1,0 +1,17 @@
+[package]
+name = "nimiapp-polyagent-shell"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+nimi-shell-tauri = "0.7.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+base64 = "0.22"
+dirs = "6"
+time = "=0.3.47"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

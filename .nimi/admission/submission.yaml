@@ -1,0 +1,40 @@
+app_id: nimi.polyagent
+display_name: PolyAgent
+version: 0.1.0
+profile: standalone
+npm_package_name: nimiapp-polyagent
+cargo_package_name: nimiapp-polyagent-shell
+tauri_identifier: ai.nimi.apps.nimi.polyagent
+package_author: Nimi Team
+submission_role: developer-submitted-input
+capability_contract_refs: []
+required_standardized_feature_refs: []
+storage_policy:
+  kind: app-owned-os-storage
+  os_storage_disclosure:
+    - path_pattern: macOS Keychain / ai.nimi.polyagent.executor.secrets / executor-*
+      purpose: Executor bearer and Relayer credential. Ordinary configuration stores only references.
+      expected_size_band: A few kilobytes per configured executor.
+    - path_pattern: macOS Keychain / ai.nimi.polyagent.polymarket.signer / polyagent-*
+      purpose: User-imported Polymarket signing key, stored directly as a Keychain item. App metadata uses Nimi managed storage; no plaintext key file.
+      expected_size_band: One 32-byte secret per imported signer.
+    - path_pattern: <user-home>/.polyagent-executor/**
+      purpose: Selected external executor submission journal, signed order material and process lock. Contains no wallet private key. A user-selected executor state directory can replace this root.
+      expected_size_band: Typically KiB to MiB of JSON, grows with orders.
+support_manifest:
+  diagnostics_bundle_fields:
+    - app_version
+    - runtime_status
+  redaction_rules:
+    - credentials
+  user_visible_issue_categories:
+    - startup
+    - runtime
+  escalation_path: README.md#support
+  kill_switch_visibility: visible
+  recovery_instructions: Restart the App from Nimi. If the problem persists, reinstall the current admitted release.
+review_inputs:
+  manifest: nimi.app.yaml
+  build_profile: .nimi/config/build-profile.yaml
+  scaffold_boundary: .nimi/contracts/scaffold-boundary.yaml
+admission_truth: platform-owned-after-review

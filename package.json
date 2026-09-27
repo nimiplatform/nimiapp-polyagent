@@ -1,0 +1,73 @@
+{
+  "name": "nimiapp-polyagent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "packageManager": "pnpm@10.34.5",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "protobufjs"
+    ]
+  },
+  "scripts": {
+    "dev": "nimi-app dev --shell electron",
+    "dev:renderer": "vite --host 127.0.0.1 --port 1524 --strictPort",
+    "dev:shell": "nimi-app dev",
+    "dev:electron": "nimi-app dev --shell electron",
+    "init": "nimi-app init --adopt",
+    "sync": "nimi-app sync",
+    "check": "nimi-app check",
+    "test": "nimi-app test",
+    "test:app": "tsx --test test/*.test.ts",
+    "app:build": "nimi-app build",
+    "pack": "nimi-app pack",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json --noEmit && node scripts/build-electron.mjs",
+    "build:electron:production": "node scripts/clean-electron-production.mjs && pnpm run build && pnpm run build:electron && node scripts/package-electron-production.mjs",
+    "build:tauri:production": "tauri build",
+    "postinstall": "install-electron --no",
+    "validate": "node scripts/validate.mjs",
+    "executor": "tsx src-executor/cli.ts",
+    "executor:build": "esbuild src-executor/cli.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist-executor/main.js",
+    "executor:prepare": "tsx src-executor/prepare.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@napi-rs/keyring": "2.1.0",
+    "@nimiplatform/kit": "^0.16.0",
+    "@nimiplatform/sdk": "^0.19.0",
+    "@polymarket/bindings": "0.11.0",
+    "@polymarket/client": "0.11.0",
+    "decimal.js": "^10.6.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "viem": "^2.56.9",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "@nimiplatform/app-tools": "^0.11.4",
+    "@nimiplatform/nimi-coding": "0.6.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^42.10.1",
+    "esbuild": "^0.28.2",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "yaml": "^2.9.0"
+  },
+  "author": "Nimi Team",
+  "license": "Apache-2.0"
+}
