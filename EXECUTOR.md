@@ -78,11 +78,15 @@ A partial FAK buy can leave a holding smaller than the venue minimum. Such a hol
 
 Accepted is not filled. The ledger records confirmed trade quantities. Live fee values are estimates; the venue account balance is authoritative. An uncertain submission is retained and freezes new buy readiness. Reusing its ID with different input fails; repeating an existing ID never posts again. Never delete the journal or choose a new ID to evade uncertainty. If no exchange order ID was received, inspect the actual venue account manually. Missing local correlation is not proof that no trade occurred.
 
+A valid wallet-bound submission refused before dispatch now leaves a durable rejected or canceled receipt. The App can read that receipt using the original submission ID, including after losing the submit response. These refusals do not consume a dispatched-buy slot. A missing journal record still does not prove that an external write failed.
+
+Direct on-chain redemptions save the expected chain, sender, destination, calldata and value before invoking the signer. Initial confirmation and recovery check the same transaction identity and require a successful receipt with two further blocks. Every transaction in a multi-transaction redemption must be confirmed, and a partially submitted workflow remains unconfirmed. A successful unrelated transaction or a bare hash cannot settle the ledger. Relayer-backed recovery retains the original SDK transaction ID.
+
 The service binds loopback only, rejects browser-origin requests and requires the bearer. Remote operation requires a separately operated authenticated HTTPS endpoint; do not simply expose the loopback port publicly.
 
 ## Verification
 
-54 focused App/executor tests pass, including actual MCP HTTP transport, per-venue approvals, finite allowance checks, observation-mode write rejection, signer restrictions, independent budgets, restart behavior, and stopping after a completed permitted round trip. Explicit venue doubles test failure/uncertainty paths; they do not certify real trades.
+72 focused App/executor tests pass, including actual MCP HTTP transport, per-venue approvals, finite allowance checks, observation-mode write rejection, signer restrictions, independent budgets, restart behavior, and stopping after a completed permitted round trip. Recovery regressions cover storage failure during stop, lost refusal responses, durable rejection receipts, cancellation immediately before dispatch, and transaction identity/depth checks across a multi-transaction redemption and reopening. Explicit venue doubles test failure/uncertainty paths; they do not certify real trades.
 
 The App-managed observation start, port-owner conflict, live-dialog cancellation, service stop/restart and authenticated account read after restart were exercised in the real supervised App on 2026-09-28. No real live-mode enablement was performed.
 

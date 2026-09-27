@@ -1,6 +1,25 @@
 import { mkdir, readFile, open, rename } from 'node:fs/promises';
 import path from 'node:path';
 import type { Receipt } from '../src/polyagent/integration.js';
+export type TransactionIntent = {
+  chainId: number;
+  from: string;
+  to: string;
+  data: string;
+  value: string;
+};
+export type RedemptionTransaction = {
+  intent: TransactionIntent;
+  transactionHash?: string;
+  confirmed?: boolean;
+};
+export type JournalRedemption = {
+  status: 'submitting' | 'confirmed' | 'unconfirmed';
+  transactionHash?: string;
+  transactionId?: string;
+  directTransactions: RedemptionTransaction[];
+  submissionComplete: boolean;
+};
 export type JournalOrder = {
   requestHash: string;
   request: {
@@ -25,14 +44,7 @@ export type JournalData = {
   version: 1;
   wallet: string;
   orders: Record<string, JournalOrder>;
-  redemptions: Record<
-    string,
-    {
-      status: 'submitting' | 'confirmed' | 'unconfirmed';
-      transactionHash?: string;
-      transactionId?: string;
-    }
-  >;
+  redemptions: Record<string, JournalRedemption>;
 };
 export interface Journal {
   data: JournalData;
@@ -70,8 +82,13 @@ export class FileJournal implements Journal {
       this.data.wallet = wallet;
       await this.save();
     }
-    for (const row of Object.values(this.data.orders))
-      if (row.receipt.status === 'submitting') row.receipt.status = 'unconfirmed';
+    for (const row of Object.values(this.data.orders)) {
+      if (row.receipt.status === 'prepared' && !row.dispatchedAt) {
+        row.receipt.status = 'canceled';
+        row.receipt.message = '准备期间执行器已停止，订单未向交易所派发';
+      } else if (['prepared', 'submitting'].includes(row.receipt.status))
+        row.receipt.status = 'unconfirmed';
+    }
     for (const row of Object.values(this.data.redemptions))
       if (row.status === 'submitting') row.status = 'unconfirmed';
     await this.save();

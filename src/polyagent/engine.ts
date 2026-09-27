@@ -64,6 +64,7 @@ export class PolyEngine {
   quotes: Record<string, Quote> = {};
   private alive = true;
   private epoch = 0;
+  private stopRevision = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private loaded?: Promise<void>;
   private writes = Promise.resolve();
@@ -127,10 +128,16 @@ export class PolyEngine {
   }
   async modify(fn: (w: Workspace) => void) {
     const task = this.writes.then(async () => {
+      const stopRevision = this.stopRevision;
       const next = structuredClone(this.state());
       fn(next);
       await this.store.save(next);
       this.check();
+      // A save already in flight cannot restore permission revoked by stop().
+      if (stopRevision !== this.stopRevision) {
+        next.running = false;
+        next.armedAt = null;
+      }
       this.workspace = next;
     });
     this.writes = task.catch(() => undefined);
@@ -335,6 +342,13 @@ export class PolyEngine {
   }
   async stop() {
     this.epoch++;
+    this.stopRevision++;
+    // Stop is effective before cancellation or storage can block or fail.
+    if (this.workspace) {
+      this.workspace.running = false;
+      this.workspace.armedAt = null;
+    }
+    this.stage = '已停止';
     this.controller?.abort();
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
@@ -346,7 +360,6 @@ export class PolyEngine {
       w.armedAt = null;
       event(w, 'stop', '已停止新交易。已有订单与持仓仍保留，请按需核对、撤单或平仓。');
     });
-    this.stage = '已停止';
   }
   dispose() {
     this.alive = false;
@@ -449,7 +462,7 @@ export class PolyEngine {
       }
     } finally {
       this.busy = false;
-      if (this.alive && this.state().running)
+      if (this.alive && epoch === this.epoch && this.state().running)
         this.schedule(this.state().policy.scanIntervalSeconds * 1000);
     }
   }
@@ -614,6 +627,7 @@ export class PolyEngine {
       const account = await this.refreshAccount();
       this.check(epoch);
       if (
+        account.access !== 'live' ||
         !account.approvalsReady ||
         account.geoblocked ||
         account.cashUsd === null ||

@@ -12,3 +12,9 @@ Experimental development build. Simulation, live trading, installation, public r
 ## App-managed executor lifecycle
 
 Settings now controls the local service: observation start, explicitly confirmed live enablement, return to observation and stop. The same service is bundled into the Electron Host; the CLI remains a developer tool. Nimi continues to own Integration permissions and calls. App exit/session invalidation stops the service, and restarts never restore live mode. Existing account configuration and trading journals are preserved. Real observation and stop/restart acceptance passed; actual financial execution remains user-run and unverified.
+
+## Recovery fixes
+
+- Stopping remains effective when ledger storage fails or an older save finishes late; executor shutdown is attempted independently.
+- Submissions refused before dispatch keep a durable terminal receipt so the App can reconcile them after a lost response.
+- Direct redemption recovery checks the saved transaction identity and all required transactions before settling the ledger. An unrelated successful transaction cannot confirm a redemption.

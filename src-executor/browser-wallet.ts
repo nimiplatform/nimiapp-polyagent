@@ -13,6 +13,7 @@ import { polygon } from 'viem/chains';
 import { signerFrom } from '@polymarket/client/viem';
 import type { Signer } from '@polymarket/client';
 import { browserWalletPage } from './browser-wallet-page.js';
+import { assertTransactionMatches, transactionIntent } from './redemption.js';
 
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
 const equal = (a: string, b: string) =>
@@ -188,18 +189,16 @@ export class BrowserWallet {
         const tx = await adapter.sendTransaction(request);
         return {
           ...tx,
-          transactionHash: tx.transactionHash,
-          transactionId: tx.transactionId,
+          get transactionHash() {
+            return tx.transactionHash;
+          },
+          get transactionId() {
+            return tx.transactionId;
+          },
           wait: async () => {
             const result = await tx.wait();
             const observed = await chain.getTransaction({ hash: result.transactionHash as Hex });
-            if (
-              observed.from.toLowerCase() !== session.address.toLowerCase() ||
-              observed.to?.toLowerCase() !== request.to.toLowerCase() ||
-              observed.input !== (request.data ?? '0x') ||
-              observed.value !== (request.value ?? 0n)
-            )
-              throw new Error('链上交易与请求不一致，需人工核对');
+            assertTransactionMatches(transactionIntent(session.address, request), observed);
             return result;
           },
         };

@@ -77,9 +77,11 @@ export function createPolyAgentHost(
     },
     'polyagent.executor.stop': async () => {
       const e = await current();
-      await e.stop();
-      await executor.stop();
-      e.account = null;
+      try {
+        await stopServices(e);
+      } finally {
+        e.account = null;
+      }
       return executor.status();
     },
     'polyagent.services': async () => {
@@ -269,12 +271,14 @@ export function createPolyAgentHost(
       }
     },
   };
+  async function stopServices(value: PolyEngine | undefined) {
+    // A failed ledger write must not prevent the owned executor from stopping.
+    const results = await Promise.allSettled([value?.stop(), executor.stop()]);
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
+  }
   return {
     handlers,
-    shutdown: async () => {
-      if (engine) await engine.stop();
-      await executor.stop();
-    },
+    shutdown: () => stopServices(engine),
     stop: async () => {
       if (engine) await engine.stop();
     },

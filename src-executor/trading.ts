@@ -5,8 +5,6 @@ import { z } from 'zod';
 import { OrderSide, OrderType, type SecureClient } from '@polymarket/client';
 import { fetchBalanceAllowance } from '@polymarket/client/actions';
 import { fetchTransaction } from '@polymarket/client/actions';
-import { createPublicClient as createChainClient, http } from 'viem';
-import { polygon } from 'viem/chains';
 import {
   EXECUTOR_VERSION,
   walletAddressSchema,
@@ -15,8 +13,9 @@ import {
 } from '../src/polyagent/integration.js';
 import { PolymarketData } from '../src/polyagent/market-data.js';
 import { bestBid, bestAsk, money, tradingFee } from '../src/polyagent/strategy.js';
-import type { Journal } from './journal.js';
+import type { Journal, JournalOrder, JournalRedemption } from './journal.js';
 import { approvedPredictionVenues } from './approvals.js';
+import { RedemptionTracker } from './redemption.js';
 
 export const submitSchema = z
   .object({
@@ -52,6 +51,7 @@ export class TradingExecutor {
     readonly data = new PolymarketData(),
     readonly geoblock: () => Promise<boolean> = checkGeoblock,
     readonly walletConnected: () => boolean = () => true,
+    readonly redemptions = new RedemptionTracker(journal),
   ) {}
   assertWallet(address: string) {
     if (
@@ -180,54 +180,15 @@ export class TradingExecutor {
     };
   }
   submit(input: unknown, signal?: AbortSignal) {
-    if (this.limits.mode !== 'live') return Promise.reject(new Error('LIVE_NOT_ENABLED'));
     return this.serial(() => this.submitOnce(submitSchema.parse(input), signal));
   }
   private async submitOnce(input: Submit, signal?: AbortSignal): Promise<Receipt> {
-    signal?.throwIfAborted();
     this.assertWallet(input.walletAddress);
-    if (input.signingMethod !== this.limits.signingMethod)
-      throw new Error('SIGNING_METHOD_MISMATCH');
     const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
     const existing = this.journal.data.orders[input.submissionId];
     if (existing) {
       if (existing.requestHash !== hash) throw new Error('SUBMISSION_ID_CONFLICT');
       return this.getUnlocked(input.submissionId);
-    }
-    if (this.limits.mode !== 'live') throw new Error('LIVE_NOT_ENABLED');
-    const budget = this.buyBudget();
-    if (input.side === 'buy' && (budget.orders <= 0 || input.maxSpendUsd > budget.cash))
-      throw new Error('EXECUTOR_TEST_BUDGET_EXHAUSTED');
-    const account = await this.account();
-    if (!account.approvalsReady || account.geoblocked || account.cashUsd === null)
-      throw new Error('ACCOUNT_NOT_READY');
-    if (
-      input.side === 'buy' &&
-      (!account.ready ||
-        input.maxSpendUsd > this.limits.maxOrderUsd ||
-        account.cashUsd < input.maxSpendUsd ||
-        account.exposureUsd === null ||
-        account.exposureUsd + input.maxSpendUsd > this.limits.maxExposureUsd)
-    )
-      throw new Error('EXECUTOR_CAPITAL_LIMIT');
-    const m = await this.data.market(input.marketId, input.assetId);
-    if (!m.venue || !account.approvedVenues.includes(m.venue))
-      throw new Error('MARKET_APPROVALS_MISSING');
-    if (!m.fee) throw new Error('MARKET_FEE_UNAVAILABLE');
-    if (!m.active || m.closed || !m.acceptingOrders) throw new Error('MARKET_NOT_TRADING');
-    const q = await this.data.quote(input.assetId);
-    if (!new Decimal(input.limitPrice).div(q.tickSize).isInteger() || input.shares < q.minOrderSize)
-      throw new Error('ORDER_TICK_OR_SIZE_INVALID');
-    if (input.side === 'buy' && (bestAsk(q) === null || bestAsk(q)! > input.limitPrice))
-      throw new Error('BUY_PRICE_LIMIT');
-    if (input.side === 'sell' && (bestBid(q) === null || bestBid(q)! < input.limitPrice))
-      throw new Error('SELL_PRICE_LIMIT');
-    const c = await this.client();
-    if (input.side === 'sell') {
-      let held = 0;
-      for await (const page of c.listPositions())
-        for (const p of page.items) if (p.assetId === input.assetId) held += Number(p.currentSize);
-      if (input.shares > held + 0.000001) throw new Error('INSUFFICIENT_POSITION');
     }
     const receipt: Receipt = {
       protocol: EXECUTOR_VERSION,
@@ -240,19 +201,65 @@ export class TradingExecutor {
       tradeIds: [],
       message: '尚未提交',
     };
-    const row = {
+    const row: JournalOrder = {
       requestHash: hash,
       request: input,
       receipt,
       createdAt: new Date().toISOString(),
-      signedOrder: undefined as unknown,
-      response: undefined as unknown,
-      marketFee: m.fee,
     };
     this.journal.data.orders[input.submissionId] = row;
-    await this.journal.save();
-    // Preparation may sign, but the fully prepared order is saved before posting.
+    const checkDispatch = () => {
+      signal?.throwIfAborted();
+      if (this.limits.mode !== 'live') throw new Error('LIVE_NOT_ENABLED');
+    };
+    let c: SecureClient;
+    // Every valid, wallet-bound submission gets a durable receipt, including
+    // checks that reject it before any signature or exchange dispatch.
     try {
+      await this.journal.save();
+      checkDispatch();
+      if (input.signingMethod !== this.limits.signingMethod)
+        throw new Error('SIGNING_METHOD_MISMATCH');
+      const budget = this.buyBudget(input.submissionId);
+      if (input.side === 'buy' && (budget.orders <= 0 || input.maxSpendUsd > budget.cash))
+        throw new Error('EXECUTOR_TEST_BUDGET_EXHAUSTED');
+      const account = await this.account(input.submissionId);
+      if (!account.approvalsReady || account.geoblocked || account.cashUsd === null)
+        throw new Error('ACCOUNT_NOT_READY');
+      if (
+        input.side === 'buy' &&
+        (!account.ready ||
+          input.maxSpendUsd > this.limits.maxOrderUsd ||
+          account.cashUsd < input.maxSpendUsd ||
+          account.exposureUsd === null ||
+          account.exposureUsd + input.maxSpendUsd > this.limits.maxExposureUsd)
+      )
+        throw new Error('EXECUTOR_CAPITAL_LIMIT');
+      const m = await this.data.market(input.marketId, input.assetId);
+      if (!m.venue || !account.approvedVenues.includes(m.venue))
+        throw new Error('MARKET_APPROVALS_MISSING');
+      if (!m.fee) throw new Error('MARKET_FEE_UNAVAILABLE');
+      if (!m.active || m.closed || !m.acceptingOrders) throw new Error('MARKET_NOT_TRADING');
+      const q = await this.data.quote(input.assetId);
+      if (
+        !new Decimal(input.limitPrice).div(q.tickSize).isInteger() ||
+        input.shares < q.minOrderSize
+      )
+        throw new Error('ORDER_TICK_OR_SIZE_INVALID');
+      if (input.side === 'buy' && (bestAsk(q) === null || bestAsk(q)! > input.limitPrice))
+        throw new Error('BUY_PRICE_LIMIT');
+      if (input.side === 'sell' && (bestBid(q) === null || bestBid(q)! < input.limitPrice))
+        throw new Error('SELL_PRICE_LIMIT');
+      c = await this.client();
+      if (input.side === 'sell') {
+        let held = 0;
+        for await (const page of c.listPositions())
+          for (const p of page.items)
+            if (p.assetId === input.assetId) held += Number(p.currentSize);
+        if (input.shares > held + 0.000001) throw new Error('INSUFFICIENT_POSITION');
+      }
+      row.marketFee = m.fee;
+      checkDispatch();
       row.signedOrder = await c.createMarketOrder(
         input.side === 'buy'
           ? {
@@ -273,10 +280,10 @@ export class TradingExecutor {
       );
       await this.journal.save();
     } catch (e) {
-      row.receipt.status = 'rejected';
-      row.receipt.message = '签名准备失败，未提交到交易所';
+      row.receipt.status = signal?.aborted ? 'canceled' : 'rejected';
+      row.receipt.message = signal?.aborted ? '提交前已取消，未向交易所派发' : rejectionMessage(e);
       await this.journal.save();
-      throw new Error('ORDER_PREPARATION_FAILED', { cause: e });
+      return row.receipt;
     }
     if (signal?.aborted) {
       row.receipt.status = 'canceled';
@@ -319,24 +326,22 @@ export class TradingExecutor {
         return row.receipt;
       }
     }
-    row.receipt.status = 'submitting';
-    row.receipt.message = '已开始提交，等待交易所结果';
-    await this.journal.save();
-    if (signal?.aborted) {
-      row.receipt.status = 'canceled';
-      row.receipt.message = '提交前已取消';
+    try {
+      checkDispatch();
+      row.receipt.status = 'submitting';
+      row.receipt.message = '已开始提交，等待交易所结果';
+      row.dispatchedAt = new Date().toISOString();
+      await this.journal.save();
+      checkDispatch();
+    } catch (e) {
+      delete row.dispatchedAt;
+      row.receipt.status = signal?.aborted ? 'canceled' : 'rejected';
+      row.receipt.message = signal?.aborted ? '提交前已取消，未向交易所派发' : rejectionMessage(e);
       await this.journal.save();
       return row.receipt;
     }
+    // After this boundary an error cannot prove that no exchange effect occurred.
     try {
-      if (signal?.aborted) {
-        row.receipt.status = 'canceled';
-        row.receipt.message = '提交前已取消';
-        await this.journal.save();
-        return row.receipt;
-      }
-      Object.assign(row, { dispatchedAt: new Date().toISOString() });
-      await this.journal.save();
       const response = await c.postOrder(
         row.signedOrder as Awaited<ReturnType<SecureClient['createMarketOrder']>>,
       );
@@ -465,21 +470,26 @@ export class TradingExecutor {
       const m = await this.data.market(marketId, assetId);
       const resolution = await this.data.resolution(m);
       if (!resolution.resolved) throw new Error('MARKET_NOT_RESOLVED');
-      const row = {
-        status: 'submitting' as 'submitting' | 'confirmed' | 'unconfirmed',
-        transactionHash: undefined as string | undefined,
-        transactionId: undefined as string | undefined,
+      const row: JournalRedemption = {
+        status: 'submitting',
+        directTransactions: [],
+        submissionComplete: false,
       };
       this.journal.data.redemptions[key] = row;
       await this.journal.save();
       try {
         const c = await this.client();
-        const tx = await c.redeemPositions({ marketId });
-        row.transactionHash = tx.transactionHash ?? undefined;
-        row.transactionId = tx.transactionId ?? undefined;
-        await this.journal.save();
+        signal?.throwIfAborted();
+        if (this.limits.mode !== 'live') throw new Error('LIVE_NOT_ENABLED');
+        const tx = await this.redemptions.run(row, () => c.redeemPositions({ marketId }));
         const result = await tx.wait();
         row.transactionHash = result.transactionHash;
+        if (
+          row.directTransactions.length
+            ? !(await this.redemptions.confirmed(row))
+            : !row.transactionId || result.transactionId !== row.transactionId
+        )
+          throw new Error('REDEMPTION_CORRELATION_UNCONFIRMED');
         row.status = 'confirmed';
         await this.journal.save();
         return {
@@ -517,21 +527,18 @@ export class TradingExecutor {
           status: 'confirmed',
           transactionHash: row.transactionHash,
         };
-      if (row.transactionId) {
+      if (row.submissionComplete && row.transactionId && !row.directTransactions?.length) {
         const tx = await fetchTransaction(await this.client(), {
           transactionId: row.transactionId,
         });
         row.transactionHash = tx.transactionHash ?? row.transactionHash;
         if (String(tx.state) === 'STATE_CONFIRMED') row.status = 'confirmed';
-      } else if (row.transactionHash) {
-        const chain = createChainClient({ chain: polygon, transport: http() });
+      } else {
         try {
-          const receipt = await chain.getTransactionReceipt({
-            hash: row.transactionHash as `0x${string}`,
-          });
-          const block = await chain.getBlockNumber();
-          if (receipt.status === 'success' && block - receipt.blockNumber >= 2n)
+          if (await this.redemptions.confirmed(row)) {
             row.status = 'confirmed';
+            row.transactionHash = row.directTransactions.at(-1)!.transactionHash;
+          }
         } catch {
           /* Still unconfirmed; never infer absence of an effect. */
         }
@@ -546,6 +553,24 @@ export class TradingExecutor {
       };
     });
   }
+}
+function rejectionMessage(error: unknown): string {
+  const reasons: Record<string, string> = {
+    LIVE_NOT_ENABLED: '执行器未启用实盘',
+    SIGNING_METHOD_MISMATCH: '签名方式与执行器不一致',
+    EXECUTOR_TEST_BUDGET_EXHAUSTED: '本轮买入额度已用完',
+    ACCOUNT_NOT_READY: '交易账户尚未就绪',
+    EXECUTOR_CAPITAL_LIMIT: '超过执行器资金上限或可用余额',
+    MARKET_APPROVALS_MISSING: '当前市场缺少交易授权',
+    MARKET_FEE_UNAVAILABLE: '市场费用规则暂不可用',
+    MARKET_NOT_TRADING: '市场已停止交易',
+    ORDER_TICK_OR_SIZE_INVALID: '订单价格步长或份额不符合交易所要求',
+    BUY_PRICE_LIMIT: '当前卖价超过买入限价',
+    SELL_PRICE_LIMIT: '当前买价低于卖出限价',
+    INSUFFICIENT_POSITION: '实际持仓不足',
+  };
+  const reason = error instanceof Error ? reasons[error.message] : undefined;
+  return `${reason ?? '提交前检查或签名准备失败'}；未向交易所派发`;
 }
 export async function checkGeoblock() {
   const response = await fetch('https://polymarket.com/api/geoblock', {

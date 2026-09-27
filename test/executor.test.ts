@@ -86,11 +86,21 @@ test('ambiguous post is durably marked unconfirmed and the same submission is ne
   assert.equal(x.posts(), 1);
   await assert.rejects(x.executor.submit({ ...order, maxSpendUsd: 6 }), /CONFLICT/);
 });
-test('executor capital ceilings cannot be raised by App or model input', async () => {
+test('executor capital ceilings produce a durable rejection without dispatch', async () => {
   const x = setup();
-  await assert.rejects(x.executor.submit({ ...input(), maxSpendUsd: 11 }), /CAPITAL/);
+  const request = { ...input(), maxSpendUsd: 11 };
+  const receipt = await x.executor.submit(request);
+  assert.equal(receipt.status, 'rejected');
+  assert.match(receipt.message, /资金上限/);
   assert.equal(x.posts(), 0);
-  assert.equal(Object.keys(x.journal.data.orders).length, 0);
+  assert.deepEqual(await x.executor.get(request.submissionId, walletAddress), receipt);
+  assert.equal(Object.keys(x.journal.data.orders).length, 1);
+  x.executor.limits.maxBuyOrders = 1;
+  x.executor.limits.maxOrderUsd = 20;
+  assert.deepEqual(await x.executor.submit(request), receipt);
+  assert.equal(x.posts(), 0, 'changing limits does not replay a refused submission');
+  await x.executor.submit(input());
+  assert.equal(x.posts(), 1, 'the refusal did not consume the only dispatched-buy slot');
 });
 test('durability failure prevents signing or submission', async () => {
   const x = setup();
@@ -104,8 +114,24 @@ test('a canceled queued call cannot dispatch an order', async () => {
   const x = setup();
   const c = new AbortController();
   c.abort();
-  await assert.rejects(x.executor.submit(input(), c.signal));
+  assert.equal((await x.executor.submit(input(), c.signal)).status, 'canceled');
   assert.equal(x.posts(), 0);
+});
+
+test('cancellation during the dispatch journal save still prevents posting', async () => {
+  const x = setup();
+  const controller = new AbortController();
+  const save = x.journal.save;
+  x.journal.save = async () => {
+    await save();
+    if (Object.values(x.journal.data.orders).some((row) => row.dispatchedAt)) controller.abort();
+  };
+  const request = input();
+  const receipt = await x.executor.submit(request, controller.signal);
+  assert.equal(receipt.status, 'canceled');
+  assert.equal(x.posts(), 0);
+  assert.equal(x.journal.data.orders[request.submissionId].dispatchedAt, undefined);
+  assert.deepEqual(await x.executor.get(request.submissionId, walletAddress), receipt);
 });
 test('matched but unconfirmed venue trades do not become fills; confirmed partial FAK does', async () => {
   const x = setup();
@@ -278,10 +304,9 @@ test('a different wallet is rejected before dispatch, cancellation or redemption
 
 test('the selected signing method cannot fall back to an imported private key', async () => {
   const x = setup();
-  await assert.rejects(
-    x.executor.submit({ ...input(), signingMethod: 'wallet' }),
-    /SIGNING_METHOD_MISMATCH/,
-  );
+  const receipt = await x.executor.submit({ ...input(), signingMethod: 'wallet' });
+  assert.equal(receipt.status, 'rejected');
+  assert.match(receipt.message, /签名方式/);
   assert.equal(x.posts(), 0);
 });
 
@@ -323,11 +348,13 @@ test('a market closing while the wallet signs prevents later submission', async 
 test('observation mode refuses every financial write before touching the client', async () => {
   const x = setup();
   x.executor.limits.mode = 'observe';
-  await assert.rejects(x.executor.submit(input()), /LIVE_NOT_ENABLED/);
+  const receipt = await x.executor.submit(input());
+  assert.equal(receipt.status, 'rejected');
+  assert.match(receipt.message, /未启用实盘/);
   await assert.rejects(x.executor.cancel(randomUUID(), walletAddress), /LIVE_NOT_ENABLED/);
   await assert.rejects(x.executor.redeem('m1', '123', walletAddress), /LIVE_NOT_ENABLED/);
   assert.equal(x.posts(), 0);
-  assert.equal(Object.keys(x.journal.data.orders).length, 0);
+  assert.equal(Object.keys(x.journal.data.orders).length, 1);
 });
 
 test('a dispatched buy consumes its single-order slot even after its final result', async () => {
@@ -336,14 +363,14 @@ test('a dispatched buy consumes its single-order slot even after its final resul
   const request = input();
   await x.executor.submit(request);
   x.journal.data.orders[request.submissionId].receipt.status = 'canceled';
-  await assert.rejects(x.executor.submit(input()), /TEST_BUDGET_EXHAUSTED/);
+  assert.equal((await x.executor.submit(input())).status, 'rejected');
   assert.equal(x.posts(), 1);
 });
 
 test('the independent cumulative buy budget cannot be exceeded', async () => {
   const x = setup();
   x.executor.limits.maxBuyBudgetUsd = 4;
-  await assert.rejects(x.executor.submit(input()), /TEST_BUDGET_EXHAUSTED/);
+  assert.equal((await x.executor.submit(input())).status, 'rejected');
   assert.equal(x.posts(), 0);
 });
 
@@ -351,6 +378,8 @@ test('a venue without its own required approval cannot receive an order', async 
   const x = setup();
   const original = x.executor.account;
   x.executor.account = async () => ({ ...(await original()), approvedVenues: ['v2'] });
-  await assert.rejects(x.executor.submit(input()), /MARKET_APPROVALS_MISSING/);
+  const receipt = await x.executor.submit(input());
+  assert.equal(receipt.status, 'rejected');
+  assert.match(receipt.message, /市场缺少交易授权/);
   assert.equal(x.posts(), 0);
 });

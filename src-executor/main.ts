@@ -281,7 +281,8 @@ export async function startExecutor(config: ExecutorConfig) {
         const baseSigner = browserWallet
           ? browserWallet.signer()
           : keychainSigner(config.wallet.credentialRef!);
-        const signer = mode === 'observe' ? authenticationOnlySigner(baseSigner) : baseSigner;
+        const trackedSigner = executor.redemptions.wrapSigner(baseSigner);
+        const signer = mode === 'observe' ? authenticationOnlySigner(trackedSigner) : trackedSigner;
         client = (async () => {
           if (
             (await signer.getAddress()).toLowerCase() !== config.wallet.signerAddress.toLowerCase()

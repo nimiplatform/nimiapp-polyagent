@@ -8,6 +8,11 @@ import { newWorkspace } from '../src/polyagent/model.js';
 import type { WorkspaceStore } from '../src/polyagent/store.js';
 import { fixture } from './fixtures.js';
 import { prepareOrder, executePaper } from '../src/polyagent/paper.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { TradingExecutor } from '../src-executor/trading.js';
+import { createExecutorServer } from '../src-executor/main.js';
+import type { Journal } from '../src-executor/journal.js';
 
 class TestStore implements WorkspaceStore {
   value: Workspace | null = null;
@@ -208,6 +213,191 @@ test('stopping while a quote is in flight prevents later entry', async () => {
   assert.equal(x.engine.workspace!.running, false);
   x.engine.dispose();
 });
+
+test('a failed stop save cannot re-arm the automatic timer when storage recovers', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const x = setup();
+  t.after(() => x.engine.dispose());
+  await x.engine.initialize();
+  await x.engine.modify((w) => {
+    w.agentBinding = 'binding';
+    w.running = true;
+    w.armedAt = new Date().toISOString();
+    w.policy.scanIntervalSeconds = 30;
+  });
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const original = x.data.scan;
+  x.data.scan = async () => {
+    entered();
+    await gate;
+    return original();
+  };
+  const scan = x.engine.scan(true);
+  await started;
+  x.store.fail = true;
+  await assert.rejects(x.engine.stop(), /disk-full/);
+  assert.equal(x.engine.workspace!.running, false);
+  assert.equal(x.engine.workspace!.armedAt, null);
+  release();
+  await scan;
+  x.store.fail = false;
+  t.mock.timers.tick(31_000);
+  await new Promise(setImmediate);
+  assert.equal(x.engine.workspace!.paper.orders.length, 0);
+  assert.equal(x.engine.workspace!.running, false);
+  await x.engine.start();
+  assert.equal(x.engine.workspace!.running, true, 'an explicit later start remains available');
+});
+
+test('a save started before stop cannot restore a running snapshot', async (t) => {
+  const x = setup();
+  t.after(() => x.engine.dispose());
+  await x.engine.initialize();
+  await x.engine.modify((w) => {
+    w.running = true;
+  });
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  x.store.save = async (w) => {
+    if (w.running) {
+      entered();
+      await gate;
+      x.store.value = structuredClone(w);
+    } else throw new Error('disk-full');
+  };
+  const pendingSave = x.engine.modify((w) => {
+    w.notifyHome = false;
+  });
+  await started;
+  const stopped = assert.rejects(x.engine.stop(), /disk-full/);
+  assert.equal(x.engine.workspace!.running, false);
+  release();
+  await pendingSave;
+  await stopped;
+  assert.equal(x.engine.workspace!.running, false);
+  assert.equal(x.engine.workspace!.armedAt, null);
+});
+
+for (const loseSubmitResponse of [false, true]) {
+  test(`a preflight rejection recovers through MCP${loseSubmitResponse ? ' after a lost response' : ''}`, async (t) => {
+    const x = setup();
+    t.after(() => x.engine.dispose());
+    const wallet = '0x' + '2'.repeat(40);
+    const journal: Journal = {
+      data: { version: 1, wallet, orders: {}, redemptions: {} },
+      save: async () => {},
+    };
+    let venueCalls = 0;
+    const executor = new TradingExecutor(
+      journal,
+      {
+        mode: 'live',
+        signingMethod: 'keychain',
+        wallet,
+        maxOrderUsd: 10,
+        maxExposureUsd: 50,
+        maxBuyOrders: 10,
+        maxBuyBudgetUsd: 100,
+      },
+      async () => {
+        venueCalls++;
+        throw new Error('must not sign or dispatch');
+      },
+      {
+        ...x.data,
+        quote: async () => ({ ...fixture().quote, asks: [{ price: 0.97, size: 100 }] }),
+      } as never,
+      async () => false,
+    );
+    executor.account = async () => ({
+      protocol: EXECUTOR_VERSION,
+      access: 'live',
+      approvedVenues: ['standard'],
+      buyOrdersRemaining: 10,
+      remainingBuyBudgetUsd: 100,
+      signingMethod: 'keychain',
+      wallet,
+      ready: true,
+      cashUsd: 100,
+      exposureUsd: 0,
+      approvalsReady: true,
+      geoblocked: false,
+      maxOrderUsd: 10,
+      maxExposureUsd: 50,
+      message: 'Test account',
+    });
+    const bearer = 'test-only-no-wallet-'.repeat(3);
+    const server = createExecutorServer(executor, bearer);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as { port: number }).port;
+    const client = new Client({ name: 'rejection-regression', version: '1' });
+    try {
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
+          requestInit: { headers: { Authorization: `Bearer ${bearer}` } },
+        }),
+      );
+      x.services.integration.listConnections = async () =>
+        [
+          {
+            targetRef: 'test',
+            available: true,
+            operations: LIVE_OPERATIONS.map((name) => ({ name })),
+            permittedOperations: [...LIVE_OPERATIONS],
+          },
+        ] as never;
+      x.services.integration.invoke = async ({ operation, inputJson }) => {
+        const result = await client.callTool({ name: operation, arguments: JSON.parse(inputJson) });
+        if (loseSubmitResponse && operation === 'polyagent.order.submit')
+          throw new Error('response-lost');
+        return {
+          callId: crypto.randomUUID(),
+          status: 'completed',
+          resultJson: JSON.stringify(result),
+        } as never;
+      };
+      await x.engine.initialize();
+      await x.engine.modify((w) => {
+        w.mode = 'live';
+        w.connectionRef = 'test';
+        w.agentBinding = 'binding';
+        w.liveLimitsConfirmed = true;
+        w.running = true;
+        w.live.cashUsd = 100;
+      });
+      await x.engine.scan(true);
+      assert.equal(
+        x.engine.workspace!.live.orders[0].status,
+        loseSubmitResponse ? 'unconfirmed' : 'rejected',
+      );
+      await x.engine.reconcileAll();
+      assert.equal(x.engine.workspace!.live.orders[0].status, 'rejected');
+      assert.equal(x.engine.workspace!.live.positions.length, 0);
+      assert.equal(venueCalls, 0);
+      assert.equal(Object.keys(journal.data.orders).length, 1);
+      await x.engine.stop();
+      await x.engine.start();
+      assert.equal(x.engine.workspace!.running, true);
+    } finally {
+      x.engine.dispose();
+      await client.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+}
 
 test('account-read permission alone verifies and binds a wallet while refusing later identity changes', async () => {
   const x = setup();
