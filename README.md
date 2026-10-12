@@ -1,5 +1,15 @@
 # PolyAgent
 
+## Published dependency and Catalog acceptance (2026-10-13)
+
+Current public release: [0.1.0](https://github.com/nimiplatform/nimiapp-polyagent/releases/tag/v0.1.0); [Registry admission #88](https://github.com/nimiplatform/nimi-app-registry/pull/88) is merged for macOS arm64 and Windows x64. Frozen locks use published SDK 0.21.0, Kit/native 0.19.3, App Tools 0.12.1 and nimi-coding 0.6.5; no local Nimi archive or source-link resolution is required.
+
+Repository checks and managed production builds, package provenance and immutable Release checks passed for both declared targets. Actual Catalog download, installation and AI acceptance ran on macOS arm64 through source Nimi Home and its matching protected Runtime (Nimi main 35498102b). Runtime identity and App Access checks remain enforced.
+
+The Catalog package read real public markets. The selected existing Nimi Agent RIVET-3 returned a complete real review, followed by a $5 virtual-paper entry against observed depth. The strategy was stopped; reopening retained the review and paper position and kept the strategy stopped.
+
+**NOT-VERIFIED:** Windows GUI installation and AI use. Real wallet access, signing, orders, cancellation, funding and redemption were not exercised. Acceptance is restricted to paper trading; it establishes no investment outcome.
+
 A standalone Nimi App for a personal Polymarket trading assistant. Appoint an existing Nimi Agent, inspect near-deadline markets, run a bounded strategy, and follow orders, positions and decisions in one local workspace.
 
 This experimental version starts in **paper trading** with $100 virtual cash. Markets, books and final resolution records come from the official Polymarket TypeScript SDK. Paper fills consume observed depth and estimate fees; they are explicitly simulated, not exchange trades. High prices are not guaranteed probabilities. A scheduled market end is not necessarily its resolution time.
@@ -18,7 +28,7 @@ pnpm dev -- --resume <current-selector>
 pnpm dev
 ```
 
-The current combination is SDK 0.19.0, Kit/native 0.16.0 and App Tools 0.11.4 with the additional declared pair. Complete local tarballs are selected in `pnpm-workspace.yaml` from `.nimi/local/packages`. A fresh checkout must receive those four artifacts before installation. These are development resolutions, not source links or public publication claims. Public-release preparation requires compatible published versions and registry resolutions.
+The frozen lock resolves published SDK 0.21.0, Kit/native 0.19.3, App Tools 0.12.1 and nimi-coding 0.6.5 from npm. Install with `pnpm install --frozen-lockfile`; local Nimi archive overrides are removed. Development still uses the matching Nimi Home supervisor.
 
 ## First journey
 
@@ -73,7 +83,7 @@ pnpm exec nimi-app pack --target macos-aarch64
 
 Unit tests use explicit doubles and do not prove real model or exchange execution. Development packages, installed packages and public releases have separate acceptance. Windows packaging and live Keychain signing require their own applicable environment verification.
 
-## Acceptance status
+## Historical acceptance (2026-09-26 to 2026-09-28)
 
 Initial paper journey verified on 2026-09-26; wallet-choice extension verified on 2026-09-27 in the real Desktop-supervised macOS App, using its exact development CDP target:
 
