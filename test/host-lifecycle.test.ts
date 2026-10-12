@@ -16,7 +16,7 @@ test('Host service stop and shutdown close the executor even when the ledger sto
   const host = createPolyAgentHost(
     () => {},
     async () => {},
-    () => {},
+    async () => {},
   );
   host.bind({
     storage: {},

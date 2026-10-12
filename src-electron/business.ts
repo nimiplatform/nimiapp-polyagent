@@ -11,7 +11,7 @@ import { permitted } from '../src/polyagent/integration.js';
 export function createPolyAgentHost(
   show: () => void,
   openWallet: (url: string) => Promise<void>,
-  copyConnectionToken: (token: string) => void,
+  copyConnectionToken: (token: string) => Promise<void>,
 ) {
   let services: NimiElectronAppBusinessServices | undefined;
   let engine: PolyEngine | undefined;
@@ -172,7 +172,7 @@ export function createPolyAgentHost(
         throw new Error('配置钱包已变化');
       const secret = await readExecutorSecrets(c.secretsRef);
       if (scope !== generation) throw new Error('Nimi 会话已变化');
-      copyConnectionToken(secret.bearer);
+      await copyConnectionToken(secret.bearer);
       return { copied: true };
     },
     'polyagent.browser-wallet.open': async () => {

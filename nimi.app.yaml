@@ -13,7 +13,8 @@ storage_policy:
   kind: app-owned-os-storage
   os_storage_disclosure:
     - path_pattern: macOS Keychain / ai.nimi.polyagent.executor.secrets / executor-*
-      purpose: Executor bearer and Relayer credential. Ordinary configuration stores only references.
+      purpose: Executor bearer and Relayer credential. Ordinary configuration stores
+        only references.
       expected_size_band: A few kilobytes per configured executor.
     - path_pattern: macOS Keychain / ai.nimi.polyagent.polymarket.signer / polyagent-*
       purpose: User-imported Polymarket signing key, stored directly as a Keychain

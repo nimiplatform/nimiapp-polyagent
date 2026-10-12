@@ -62,12 +62,18 @@ const business = createPolyAgentHost(
     } else void createMainWindow();
   },
   (url) => shell.openExternal(url),
-  (token) => {
+  async (token) => {
     if (clipboardTimer) clearTimeout(clipboardTimer);
-    clipboard.writeText(token);
-    clipboardTimer = setTimeout(() => {
-      if (clipboard.readText() === token) clipboard.clear();
+    clipboardTimer = undefined;
+    await clipboard.writeText(token);
+    const timer = setTimeout(() => {
+      void clipboard.readText().then((current) => {
+        if (clipboardTimer === timer && current === token) clipboard.clear();
+      }).catch(() => {
+        process.stderr.write('[polyagent-clipboard] Could not inspect clipboard for token expiry.\n');
+      });
     }, 60000);
+    clipboardTimer = timer;
   },
 );
 

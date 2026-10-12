@@ -1,3 +1,7 @@
+## 0.1.0 · Published platform dependencies
+
+Uses public npm SDK 0.21.0, Kit/native 0.19.3, App Tools 0.12.1 and nimi-coding 0.6.5 with frozen registry lockfiles. Local Nimi tarball overrides are removed; Desktop-supervised development and installed Apps use the same published carrier.
+
 # PolyAgent 0.1.0 — development
 
 - Standalone Nimi-supervised App with protected Agent work, storage, Activity and Integration.
