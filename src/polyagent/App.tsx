@@ -333,7 +333,7 @@ export function PolyAgentApp() {
                     候选市场 <span>{markets.length}</span>
                   </h2>
                   <p>
-                    预计结束时间 {w.policy.minMinutes} 分钟–{w.policy.maxHours} 小时 · 更新{' '}
+                    距结束 {w.policy.minMinutes} 分钟–{w.policy.maxHours} 小时 · 更新{' '}
                     {when(w.lastScanAt)}
                   </p>
                 </div>
@@ -1008,8 +1008,8 @@ function Settings({
         <div className="pa-field-grid">
           {field('minPrice', '最低入场价', '美元 / 份', 0.005)}
           {field('maxPrice', '最高入场价', '美元 / 份', 0.005)}
-          {field('minMinutes', '最短结束间隔', '分钟', 1)}
-          {field('maxHours', '最长结束间隔', '小时', 1)}
+          {field('minMinutes', "距到期最短", '分钟', 1)}
+          {field('maxHours', "距到期最长", '小时', 1)}
           {field('minLiquidityUsd', '最低流动性', '美元', 100)}
           {field('maxSpread', '最大买卖价差', '美元', 0.001)}
           {field('minPayoutMarginBps', '扣费后最小兑付价差', '基点', 5)}
@@ -1087,10 +1087,7 @@ function Settings({
                 ) : (
                   <>
                     <p className="pa-muted">
-                      一次性导入后清空输入。秘密保存在系统
-                      Keychain，不写入普通文件、环境配置、模型上下文或账本。自动交易在钥匙串可访问时按需签名，不要求每笔
-                      Touch ID。
-                    </p>
+                      一次性导入后即清空输入。私钥保存在系统钥匙串（Keychain）中，不会写入普通文件、环境配置、模型上下文或账本。钥匙串可访问时，自动交易会按需签名，无需逐笔验证 Touch ID。</p>
                     <label className="pa-field">
                       <span>Polymarket 账户钱包地址</span>
                       <input
